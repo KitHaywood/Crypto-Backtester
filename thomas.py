@@ -145,13 +145,14 @@ def opstrat(p,ind,bstart,bend,btd,eq,wins,degs):
                 )
 
         def next(self):
-            if (self.grad > 0) & all(self.acc[-3:] > 0) & (self.grad[-2] < 0): 
+            if all(self.grad > 0) & all(self.acc > 0): 
                 self.position.close()
                 self.buy()
 
-            elif (self.grad < 0) & all(self.acc[-3:] < 0) & (self.acc[-2] > 0): 
+            elif all(self.grad < 0)  & all(self.acc < 0): 
                 self.position.close()
                 self.sell()
+    # crossover(self.zeros, self.grad)
     bt_std = Backtest(
             p,
             FourierTimStandard,
@@ -203,14 +204,16 @@ def populate_columns(p,opst,eq,start,end,ind):
     data['grads'] = s_ind.accs
     # breakpoint() # popcol 1
     # data['signal'] = [0 if x==0 else 1 if (data.iloc[x]['accs']>0 and data.iloc[x]['grads']>0) else -1 if (data.iloc[x]['accs']<0 and data.iloc[x]['grads']<0) else 0 for x in range(data.shape[0])]
-    data['signal'] = [0 if x==0 else 1 if (all(data.iloc[x-3:]['accs']>0) and data.iloc[x-1]['grads']<0 and data.iloc[x]['grads']>0)
-                    else -1 if (all(data.iloc[x-3:]['accs']<0) and data.iloc[x-1]['grads']>0 and data.iloc[x]['grads']<0)
+    data['signal'] = [0 if x==0 else 1 if (data.iloc[x]['accs']>0 and data.iloc[x-1]['grads']<0 and data.iloc[x]['grads']>0)
+                    else -1 if (data.iloc[x]['accs']<0 and data.iloc[x-1]['grads']>0 and data.iloc[x]['grads']<0)
                     else 0 for x in range(data.shape[0])]
     posdf = data[data['signal']!=0]
     data['signal'] = data['signal'].replace(to_replace=0,method="ffill")
+    
+   
+    
     data['equity'] =  [None for _ in range(p.shape[0])]
     data['pct_ch'] = data['Close'].pct_change()
-    
     _f = pd.DataFrame().reindex_like(data)
     # breakpoint() # popcol 2
     for i,x in data.iterrows():
@@ -313,7 +316,7 @@ def main(c,md,btd):
             opst = opstrat(p,ind,i-timedelta(hours=btd),i,btd,data.loc[i]['equity'],ws,ds)
             outstrat[i] = opst
             data,posdf = populate_columns(p,opst,data.loc[i]['equity'],i,M_end,ind)
-            bigpos = pd.concat([bigpos,posdf])
+            bigpos = bigpos.append(posdf)
             f.loc[i:] = data.loc[i:]
             f = add_metrics(f)
         else:
@@ -323,7 +326,7 @@ def main(c,md,btd):
         i = i+timedelta(hours=1)
     f = add_metrics(f)
     bigpos['colour'] = ['green' if x==1 else 'red' if x==-1 else None for x in list(bigpos.signal)]
-    bigpos['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(bigpos.signal)]
+            
     return f,opst,outstrat,bigpos
 
 

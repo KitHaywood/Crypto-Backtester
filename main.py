@@ -19,7 +19,8 @@ dash_app.layout = app_layout()
 app = dash_app.server
 
 @dash_app.callback(
-    [Output('iprices-data', 'data'),Output('posdf-data','data'),Output('outstrat-data','data')], Input('go-button', 'n_clicks'),
+    [Output('iprices-data', 'data'),Output('posdf-data','data'),Output('outstrat-data','data')],
+    Input('go-button', 'n_clicks'),
     [State('crypto-selector','value'),State('btd-input','value'),
      State('md-input','value'),State('mdd-input','value')]
 )
@@ -27,6 +28,7 @@ def get_data(n,c,btd,md,mdd):
     data,opst,outstrat,posdf = main(c=c,md=md,btd=btd)
     print(data,posdf)
     newout = {}
+    # deal with json -- datetime issue
     for k,v in outstrat.items():
         newk = dt.datetime.strftime(k,"%Y-%m-%d %H:%M:%S")
         newout[newk] = v
@@ -56,6 +58,22 @@ def update_price_chart(data,posdf):
     fig.update_layout(
         template='simple_white'
     )
+    if not xaxis_config:
+            pass
+    
+    else:
+        #For some reason it's necessary to convert the relayout dict keys to strings
+        keys_values = xaxis_config.items()
+        xaxis = {str(key): value for key, value in keys_values}
+        try:
+            if 'autosize' in xaxis.keys():
+                pass
+            elif 'xaxis.autorange' in xaxis.keys():
+                fig.update_xaxes(autorange = True)
+            else:
+                fig.update_xaxes(range=[xaxis['xaxis.range[0]'],xaxis['xaxis.range[1]']])
+        except:
+            pass
     return fig
 
 @dash_app.callback(
@@ -103,6 +121,15 @@ def update_signal_chart(data,outstrat):
             
     accfig.add_hline(y=0)
     return accfig
+
+@app.callback(
+    Output('axis_data', 'children'),
+    [Input('graph1', 'relayoutData'),
+     Input('graph2', 'relayoutData')])
+
+def read_relayout(data1, data2):
+    
+    return str(data1) + '///' + str(data2)
 
 if __name__=="__main__":
     dash_app.run_server(host='0.0.0.0',threaded=True, debug=True, port=7080)

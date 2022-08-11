@@ -39,9 +39,7 @@ def app_layout():
         ])],style={'display':'flex','margin':'15px'}),
         html.Div(
             [
-                dcc.Graph(id='price-chart'),
-                dcc.Graph(id='signal-chart'),
-                dcc.Graph(id='equity-chart')
+                dcc.Graph(id='mygraph'),
             ]
         ),
         dcc.Markdown(id='axis_data')
