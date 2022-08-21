@@ -10,6 +10,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly.graph_objs.scatter import Line
 import json
+import warnings
+warnings.filterwarnings("ignore")
 
 def prices(c,start,end):
     if c=='BTC':
@@ -153,8 +155,8 @@ def opstrat(p,ind,bstart,bend,btd,eq,wins,degs,mt,pracc):
     return opst
 
 def add_metrics(_f): 
-    _f['1_eq_ch'] = _f['equity'].pct_change() # pct ch with t-1
-    _f['long_ch'] = _f['equity'].pct_change(periods=5) #pct diff with t-5
+    # _f['1_eq_ch'] = _f['equity'].pct_change() # pct ch with t-1
+    # _f['long_ch'] = _f['equity'].pct_change(periods=5) #pct diff with t-5
     _f['rolling_max'] = [max(_f['equity'].loc[:i]) for i in list(_f.index)]
     _f['rolling_min'] = [min(_f['equity'].loc[:i]) for i in list(_f.index)]
     
@@ -185,7 +187,9 @@ def populate_columns(p,opst,eq,start,end,ind,pracc):
                         else 0 for x in range(data.shape[0])]
         
     posdf = data[data['presignal']!=0]
+    # breakpoint()
     data['signal'] = data['presignal'].replace(to_replace=0,method="ffill")
+    # breakpoint()
     data['equity'] =  [None for _ in range(p.shape[0])]
     data['pct_ch'] = data['Close'].pct_change()
     
@@ -265,13 +269,28 @@ def main(c,md,btd,mt,pracc,mdd):
     M_start = M_end - timedelta(hours=md+btd)
     print(M_end,M_start)
     eq = 100000
+    
+    
     # p is always full p dont change
     p = prices(c,M_start,M_end) # (1) Load Prices - here p is [btd+md]
     ind,ws,ds = all_indics(c,M_start,M_end) # (2) inds required for (2)
+    
+    
     # Sort starts and ends properly here
     istart = M_start
     iend = M_start+timedelta(hours=btd) # check
-    opst = opstrat(p,ind,istart,iend,btd,eq,ws,ds,mt,pracc) # (2) opstr
+    opst = opstrat(
+        p, # prices df
+        ind, # dict of dict of indicator dfs
+        istart, # the initial backtest datetimes start
+        iend, # the end of the initial backtest
+        btd, # the depth of the in sample backtests in hours
+        eq, # the equity as int
+        ws, # windows
+        ds, # degrees
+        mt, # max trades
+        pracc # preceding acceleration depth
+        ) # (2) opstr
     # M_end is major end, iend is the end of the initial backtest
     bigpos = pd.DataFrame()
     data,posdf = populate_columns(p,opst,eq,iend,M_end,ind,pracc)
@@ -280,31 +299,66 @@ def main(c,md,btd,mt,pracc,mdd):
     i = min(f.index)
     outstrat = {}
     outstrat[iend] = opst
+    
+    
     while i != max(f.index):
+        
+        # Deals with first case in i-date-loop
         if data.loc[i]['rolling_max']==data.loc[i]['rolling_min']==data.loc[i]['equity']:
             f.loc[i] = data.loc[i]
-        elif data.loc[i]['rolling_min'] > data.iloc[0]['equity'] * mdd:
+            
+        # if (roll_min < init_eq * mdd) and (eq > mdd )
+        # elif not (data.loc[i]['rolling_min'] < eq * mdd) \
+        #     and (data.loc[i]['equity'] > (mdd * data.loc[i]['rolling_max'])) \
+        #     and (data.loc[i]['rolling_max'] > eq * (1 + (1 - mdd))):
+        #     f.loc[i] = data.loc[i]
+        
+        # if rolling_min > eq * mdd  - what is this case?
+        elif data.loc[i]['rolling_min'] > eq * mdd:
             print(i,"first elif",data.loc[i]['rolling_min'] > data.iloc[0]['equity'] * mdd)
             f.loc[i] = data.loc[i]
-        elif (data.loc[i]['equity'] < data.loc[i]['rolling_max']*0.99 and data.loc[i]['equity']>eq) or \
-            len(list(set(list(data['equity'].loc[i-timedelta(hours=100):i]))))>1:
+        
+        
+        # else:
+            
+            
+        elif (data.loc[i]['equity'] < data.loc[i]['rolling_max']*0.99 and data.loc[i]['equity']>eq):
             print(
                 i,
                 "2nd elif",
-                len(list(set(list(data['equity'].loc[i-timedelta(hours=100):i]))))>1,
                 (data.loc[i]['equity'] < data.loc[i]['rolling_max']*0.99 and data.loc[i]['equity']>eq)
                 )
+            
+            
             opst = opstrat(p,ind,i-timedelta(hours=btd),i,btd,data.loc[i]['equity'],ws,ds,mt,pracc)
+            print(opst)
             outstrat[i] = opst
-            data,posdf = populate_columns(p,opst,data.loc[i]['equity'],i,M_end,ind,pracc)
+            data,posdf = populate_columns(
+                p,
+                opst,
+                data.loc[i]['equity'],
+                i,
+                M_end,
+                ind,
+                pracc
+                )
+            
+            
             bigpos = pd.concat([bigpos,posdf])
             f.loc[i:] = data.loc[i:]
             f = add_metrics(f)
+            
+            
         else:
             f.loc[i] = data.loc[i]
-            # f = add_metrics(f)
+            f = add_metrics(f)
+        
         i = i+timedelta(hours=1)
+        
     f = add_metrics(f)
+
+
+
 
     bigpos['colour'] = ['green' if x==1 else 'red' if x==-1 else None for x in list(bigpos.presignal)]
     bigpos['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(bigpos.presignal)]

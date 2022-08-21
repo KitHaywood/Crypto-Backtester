@@ -13,6 +13,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from signaller import *
 import json
+import dash_bootstrap_components as dbc
 
 dash_app = dash_app
 dash_app.layout = app_layout()

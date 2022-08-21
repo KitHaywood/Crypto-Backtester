@@ -65,11 +65,9 @@ def relayout_graph2(xaxis_config):
         pass
     
     else:
-        
         #For some reason it's necessary to convert the relayout dict keys to strings
         keys_values = xaxis_config.items()
         xaxis = {str(key): value for key, value in keys_values}
-        
         try:
             if 'autosize' in xaxis.keys():
                 pass
@@ -77,7 +75,6 @@ def relayout_graph2(xaxis_config):
                 figure2.update_xaxes(autorange = True)
             else:
                 figure2.update_xaxes(range=[xaxis['xaxis.range[0]'],xaxis['xaxis.range[1]']])
-        
         except:
             pass
     

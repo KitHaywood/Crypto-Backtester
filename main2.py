@@ -7,37 +7,43 @@ import datetime as dt
 from apps.app import dash_app
 import pandas as pd
 from utils import *
+from datetime import datetime
 import pdb
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from signaller import *
+from signaller2 import *
 import json
+import urllib
+from dash import dcc
 
 dash_app = dash_app
 dash_app.layout = app_layout()
 app = dash_app.server
 
 @dash_app.callback(
-    [Output('iprices-data', 'data'),Output('posdf-data','data'),Output('outstrat-data','data')],
+    [Output('iprices-data', 'data'),Output('posdf-data','data'),Output('outstrat-data','data'),Output('main-load','children')],
     Input('go-button', 'n_clicks'),
     [State('crypto-selector','value'),State('btd-input','value'),
-     State('md-input','value'),State('mdd-input','value')]
+    State('md-input','value'),State('mdd-input','value'),State('mt-input','value'),
+    State('pracc-input','value')],
+    prevent_initial_call=True
 )
-def get_data(n,c,btd,md,mdd):
-    data,opst,outstrat,posdf = main(c=c,md=md,btd=btd)
-    print(data,posdf)
+def get_data(n,c,btd,md,mdd,mt,pracc):
+    data,opst,outstrat,posdf = main(c=c,md=md,btd=btd,mt=mt,pracc=pracc,mdd=mdd)
+    # print(data,posdf)
     newout = {}
     # deal with json -- datetime issue
     for k,v in outstrat.items():
         newk = dt.datetime.strftime(k,"%Y-%m-%d %H:%M:%S")
         newout[newk] = v
         
-    return data.to_json(date_format='iso', orient='split'),posdf.to_json(date_format='iso', orient='split'),json.dumps(newout,default=str)
+    return data.to_json(date_format='iso', orient='split'),posdf.to_json(date_format='iso', orient='split'),json.dumps(newout,default=str),""
 
 @dash_app.callback(
     Output('mygraph','figure'),
-    [Input('iprices-data','data'),Input('posdf-data','data'),Input('outstrat-data','data')]
+    [Input('iprices-data','data'),Input('posdf-data','data'),Input('outstrat-data','data')],
+    prevent_initial_call=True
 )
 def grapher(data,posdf,outstrat):
     data = pd.read_json(data,orient='split')
@@ -54,7 +60,7 @@ def grapher(data,posdf,outstrat):
         x=posdf.index,
         y=posdf['Close'],
         mode='markers',
-        marker = dict(size = 10, color = posdf['colour'], symbol = posdf['symbol'])
+        marker = dict(size = 20, color = posdf['colour'], symbol = posdf['symbol'])
     )
     eqtc = go.Scatter(x=data.index,y=data['equity'],line = Line({'color': 'darkblue', 'width': 1}),name='equity')
     eqtc2 = go.Scatter(x=data.index,y=data['ema_eq'],line = Line({'color': 'red', 'width': 1}),name='EMA')
@@ -67,7 +73,13 @@ def grapher(data,posdf,outstrat):
     data1 = [pricetc,sigtc]
     data2 = [eqtc,eqtc2,eqtc3,eqtc4,eqtc5,eqtc6]
     data4 = [acctc,gradtc]
-    fig = make_subplots(rows=3, cols=1,shared_xaxes=True,subplot_titles=("Price + Signal","Equity + Measures",f"Indicators"))
+    fig = make_subplots(
+        rows=3,
+        cols=1,
+        shared_xaxes=True,
+        subplot_titles=("Price + Signal","Equity + Measures",f"Indicators"),
+        vertical_spacing=0.1
+        )
     fig.add_traces(data1, rows=1, cols=1)
     fig.add_traces(data2, rows=2, cols=1)
     fig.add_traces(data4,rows=3,cols=1)
@@ -88,8 +100,33 @@ def grapher(data,posdf,outstrat):
             )
         except IndexError:
             breakpoint()
-    fig.update_layout(height=1200, width=1500)
+    fig.update_layout(
+        height=1000,
+        width=1500,
+        xaxis_showticklabels=True,
+        xaxis2_showticklabels=True,
+        xaxis3_showticklabels=True,
+        hovermode='x unified'
+        )
     return fig
+
+@dash_app.callback(
+    Output('dl-df','data'),
+    [Input('downlink','n_clicks'),Input('iprices-data', 'data')],
+    prevent_initial_call=True
+)
+def downloader(n_clicks,data):
+    data = pd.read_json(data,orient='split')
+    return dcc.send_data_frame(data.to_csv,f'price_{datetime.today().replace(second=0,microsecond=0).isoformat(sep="T")}.csv')
+
+@dash_app.callback(
+    Output('posdf-dl-df','data'),
+    [Input('posdf-downlink','n_clicks'),Input('posdf-data', 'data')],
+    prevent_initial_call=True
+)
+def downloader2(n_clicks,data):
+    data = pd.read_json(data,orient='split')
+    return dcc.send_data_frame(data.to_csv,f'posdf_{datetime.today().replace(second=0,microsecond=0).isoformat(sep="T")}.csv')
 
 if __name__=="__main__":
     dash_app.run_server(host='0.0.0.0',threaded=True, debug=True, port=7080)
