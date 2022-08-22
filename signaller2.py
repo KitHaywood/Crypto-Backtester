@@ -295,42 +295,33 @@ def main(c,md,btd,mt,pracc,mdd):
     bigpos = pd.DataFrame()
     data,posdf = populate_columns(p,opst,eq,iend,M_end,ind,pracc)
     bigpos = pd.concat([bigpos,posdf])
-    
-    
     f = pd.DataFrame().reindex_like(data)
-    
     i = min(f.index)
     outstrat = {}
     outstrat[iend] = opst
-                
-        # if (roll_min < init_eq * mdd) and (eq > mdd )
-        # elif not (data.loc[i]['rolling_min'] < eq * mdd) \
-        #     and (data.loc[i]['equity'] > (mdd * data.loc[i]['rolling_max'])) \
-        #     and (data.loc[i]['rolling_max'] > eq * (1 + (1 - mdd))):
-        #     f.loc[i] = data.loc[i]
-        
-        # if rolling_min > eq * mdd  - what is this case?
-        
-    total_area = 0
-    sma_area = 0
-    mean_area = 0
-    maxeq = 0
-    ema_eq = 0
-    mean_eq = 0
+                        
+    # total_area = 0
+    # sma_area = 0
+    # mean_area = 0
+    # maxeq = 0
+    # ema_eq = 0
+    # mean_eq = 0
+    
     while i != max(f.index): 
-        maxeq = max(maxeq,data.loc[i]['equity'])
-        ema_eq = max(ema_eq,data.loc[i]['equity'])
-        mean_eq = max(mean_eq,data.loc[i]['mean_eq'])
-        total_area = total_area + (maxeq - data.loc[i]['equity'])
-        sma_area = sma_area + (ema_eq - data.loc[i]['equity'])
-        mean_area = mean_area + (mean_eq - data.loc[i]['equity'])
+        
+        # maxeq = max(maxeq,data.loc[i]['equity'])
+        # ema_eq = max(ema_eq,data.loc[i]['equity'])
+        # mean_eq = max(mean_eq,data.loc[i]['mean_eq'])
+        # total_area = total_area + (maxeq - data.loc[i]['equity'])
+        # sma_area = sma_area + (ema_eq - data.loc[i]['equity'])
+        # mean_area = mean_area + (mean_eq - data.loc[i]['equity'])
         
         print(maxeq,total_area,data.loc[i]['equity'])
         
         if maxeq==data.loc[i]['rolling_min']==data.loc[i]['equity']:
             f.loc[i] = data.loc[i]
         
-        if total_area > mdd and not all(data.loc[i-timedelta(hours=5):]['1_eq_ch']>0.01):
+        if total_area > mdd:
 
             opst = opstrat(p,ind,i-timedelta(hours=btd),i,btd,data.loc[i]['equity'],ws,ds,mt,pracc)
             outstrat[i] = opst
