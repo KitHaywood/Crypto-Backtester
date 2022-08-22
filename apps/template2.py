@@ -33,10 +33,10 @@ def app_layout():
                     type='number',
                     placeholder="input an integer",
                     value=1000),
-                html.Label(['Select Max-Drawdown Threshold'],style={'text-align':'left','color':'black'}),
+                html.Label(['Select Area'],style={'text-align':'left','color':'black'}),
                     dcc.Input(
                     id='mdd-input',
-                    value=0.975,
+                    value=250000,
                     type='number',
                     placeholder="input [0.0 -- 1.0]")
         ]),

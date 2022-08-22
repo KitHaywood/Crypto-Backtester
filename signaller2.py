@@ -155,7 +155,7 @@ def opstrat(p,ind,bstart,bend,btd,eq,wins,degs,mt,pracc):
     return opst
 
 def add_metrics(_f): 
-    # _f['1_eq_ch'] = _f['equity'].pct_change() # pct ch with t-1
+    _f['1_eq_ch'] = _f['equity'].pct_change() # pct ch with t-1
     # _f['long_ch'] = _f['equity'].pct_change(periods=5) #pct diff with t-5
     _f['rolling_max'] = [max(_f['equity'].loc[:i]) for i in list(_f.index)]
     _f['rolling_min'] = [min(_f['equity'].loc[:i]) for i in list(_f.index)]
@@ -295,18 +295,14 @@ def main(c,md,btd,mt,pracc,mdd):
     bigpos = pd.DataFrame()
     data,posdf = populate_columns(p,opst,eq,iend,M_end,ind,pracc)
     bigpos = pd.concat([bigpos,posdf])
+    
+    
     f = pd.DataFrame().reindex_like(data)
+    
     i = min(f.index)
     outstrat = {}
     outstrat[iend] = opst
-    
-    
-    while i != max(f.index):
-        
-        # Deals with first case in i-date-loop
-        if data.loc[i]['rolling_max']==data.loc[i]['rolling_min']==data.loc[i]['equity']:
-            f.loc[i] = data.loc[i]
-            
+                
         # if (roll_min < init_eq * mdd) and (eq > mdd )
         # elif not (data.loc[i]['rolling_min'] < eq * mdd) \
         #     and (data.loc[i]['equity'] > (mdd * data.loc[i]['rolling_max'])) \
@@ -314,24 +310,29 @@ def main(c,md,btd,mt,pracc,mdd):
         #     f.loc[i] = data.loc[i]
         
         # if rolling_min > eq * mdd  - what is this case?
-        elif data.loc[i]['rolling_min'] > eq * mdd:
-            print(i,"first elif",data.loc[i]['rolling_min'] > data.iloc[0]['equity'] * mdd)
+        
+    total_area = 0
+    sma_area = 0
+    mean_area = 0
+    maxeq = 0
+    ema_eq = 0
+    mean_eq = 0
+    while i != max(f.index): 
+        maxeq = max(maxeq,data.loc[i]['equity'])
+        ema_eq = max(ema_eq,data.loc[i]['equity'])
+        mean_eq = max(mean_eq,data.loc[i]['mean_eq'])
+        total_area = total_area + (maxeq - data.loc[i]['equity'])
+        sma_area = sma_area + (ema_eq - data.loc[i]['equity'])
+        mean_area = mean_area + (mean_eq - data.loc[i]['equity'])
+        
+        print(maxeq,total_area,data.loc[i]['equity'])
+        
+        if maxeq==data.loc[i]['rolling_min']==data.loc[i]['equity']:
             f.loc[i] = data.loc[i]
         
-        
-        # else:
-            
-            
-        elif (data.loc[i]['equity'] < data.loc[i]['rolling_max']*0.99 and data.loc[i]['equity']>eq):
-            print(
-                i,
-                "2nd elif",
-                (data.loc[i]['equity'] < data.loc[i]['rolling_max']*0.99 and data.loc[i]['equity']>eq)
-                )
-            
-            
+        if total_area > mdd and not all(data.loc[i-timedelta(hours=5):]['1_eq_ch']>0.01):
+
             opst = opstrat(p,ind,i-timedelta(hours=btd),i,btd,data.loc[i]['equity'],ws,ds,mt,pracc)
-            print(opst)
             outstrat[i] = opst
             data,posdf = populate_columns(
                 p,
@@ -342,17 +343,17 @@ def main(c,md,btd,mt,pracc,mdd):
                 ind,
                 pracc
                 )
-            
-            
+        
             bigpos = pd.concat([bigpos,posdf])
             f.loc[i:] = data.loc[i:]
-            f = add_metrics(f)
-            
+            # The problem is that rolling max is not the rolling max of the entire sytem
+            # f = add_metrics(f)
+            total_area = 0
+            sma_area = 0
             
         else:
             f.loc[i] = data.loc[i]
-            f = add_metrics(f)
-        
+            
         i = i+timedelta(hours=1)
         
     f = add_metrics(f)

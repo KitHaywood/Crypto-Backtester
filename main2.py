@@ -49,7 +49,10 @@ def grapher(data,posdf,outstrat):
     data = pd.read_json(data,orient='split')
     posdf = pd.read_json(posdf,orient='split')
     posdf['marker_size'] = [10 for _ in range(posdf.shape[0])]
+    posdf = data[data['presignal']!=0]
     posdf = posdf.sort_index(ascending=True)
+    posdf['colour'] = ['green' if x==1 else 'red' if x==-1 else None for x in list(posdf.presignal)]
+    posdf['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(posdf.presignal)]
     outstrat = json.loads(outstrat)
     newstrat = {}
     for k,v in outstrat.items():
@@ -85,7 +88,27 @@ def grapher(data,posdf,outstrat):
     fig.add_traces(data4,rows=3,cols=1)
     ivls = list(newstrat.keys()) # these are intervals
     ivls.append(datetime.today().replace(minute=0,second=0,microsecond=0))
-    colours = ['blue','green','red','orange','purple','blue','darkgreen','skyblue']
+    colours = ['aqua', 'aquamarine', 'azure',
+                'beige', 'bisque', 'black', 'blanchedalmond', 'blue',
+                'blueviolet', 'brown', 'burlywood', 'cadetblue',
+                'chartreuse', 'chocolate', 'coral', 'cornflowerblue',
+                'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan',
+                'darkgoldenrod', 'darkgray', 'darkgrey', 'darkgreen',
+                'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange',
+                'darkorchid', 'darkred', 'darksalmon', 'darkseagreen',
+                'darkslateblue', 'darkslategray', 'darkslategrey',
+                'darkturquoise', 'darkviolet', 'deeppink', 'deepskyblue',
+                'dimgray', 'dimgrey', 'dodgerblue', 'firebrick',
+                'floralwhite', 'forestgreen', 'fuchsia', 'gainsboro',
+                'ghostwhite', 'gold', 'goldenrod', 'gray', 'grey', 'green',
+                'greenyellow', 'honeydew', 'hotpink', 'indianred', 'indigo',
+                'ivory', 'khaki', 'lavender', 'lavenderblush', 'lawngreen',
+                'lemonchiffon', 'lightblue', 'lightcoral', 'lightcyan',
+                'lightgoldenrodyellow', 'lightgray', 'lightgrey',
+                'lightgreen', 'lightpink', 'lightsalmon', 'lightseagreen',
+                'lightskyblue', 'lightslategray', 'lightslategrey',
+                'lightsteelblue','lightyellow', 'lime', 'limegreen',
+                'yellowgreen']
     # breakpoint()
     for i in range(1,len(ivls)):
         try:
