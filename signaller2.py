@@ -214,6 +214,7 @@ def populate_columns(p,opst,eq,start,end,ind,pracc):
                 print(e)
                 
     _f = add_metrics(_f)
+    _f['hwm'] = [max(_f['equity'].loc[:i]) for i in list(_f.index)]
     # breakpoint()
     return _f,posdf
     
@@ -299,29 +300,20 @@ def main(c,md,btd,mt,pracc,mdd):
     i = min(f.index)
     outstrat = {}
     outstrat[iend] = opst
-                        
-    # total_area = 0
-    # sma_area = 0
-    # mean_area = 0
-    # maxeq = 0
-    # ema_eq = 0
-    # mean_eq = 0
-    
+    maxeq = 0
+    total_area = 0
+        
     while i != max(f.index): 
         
         # maxeq = max(maxeq,data.loc[i]['equity'])
-        # ema_eq = max(ema_eq,data.loc[i]['equity'])
-        # mean_eq = max(mean_eq,data.loc[i]['mean_eq'])
-        # total_area = total_area + (maxeq - data.loc[i]['equity'])
-        # sma_area = sma_area + (ema_eq - data.loc[i]['equity'])
-        # mean_area = mean_area + (mean_eq - data.loc[i]['equity'])
-        
+        total_area = total_area + (data.loc[i]['mean_eq'] - data.loc[i]['equity'])
+
         print(maxeq,total_area,data.loc[i]['equity'])
         
         if maxeq==data.loc[i]['rolling_min']==data.loc[i]['equity']:
             f.loc[i] = data.loc[i]
         
-        if total_area > mdd:
+        if total_area > mdd or data.loc[i]['equity'] < data.loc[i]['rolling_max'] * 0.975:
 
             opst = opstrat(p,ind,i-timedelta(hours=btd),i,btd,data.loc[i]['equity'],ws,ds,mt,pracc)
             outstrat[i] = opst
@@ -339,9 +331,9 @@ def main(c,md,btd,mt,pracc,mdd):
             f.loc[i:] = data.loc[i:]
             # The problem is that rolling max is not the rolling max of the entire sytem
             # f = add_metrics(f)
-            total_area = 0
-            sma_area = 0
-            
+            total_area = 0 # reset area to 0
+            maxeq = 0
+
         else:
             f.loc[i] = data.loc[i]
             

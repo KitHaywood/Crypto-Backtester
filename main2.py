@@ -88,14 +88,14 @@ def grapher(data,posdf,outstrat):
     fig.add_traces(data4,rows=3,cols=1)
     ivls = list(newstrat.keys()) # these are intervals
     ivls.append(datetime.today().replace(minute=0,second=0,microsecond=0))
-    colours = ['aqua', 'aquamarine', 'azure',
+    colours = ['aqua','darkred','aquamarine', 'azure',
                 'beige', 'bisque', 'black', 'blanchedalmond', 'blue',
                 'blueviolet', 'brown', 'burlywood', 'cadetblue',
                 'chartreuse', 'chocolate', 'coral', 'cornflowerblue',
                 'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan',
                 'darkgoldenrod', 'darkgray', 'darkgrey', 'darkgreen',
                 'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange',
-                'darkorchid', 'darkred', 'darksalmon', 'darkseagreen',
+                'darkorchid', 'darksalmon', 'darkseagreen',
                 'darkslateblue', 'darkslategray', 'darkslategrey',
                 'darkturquoise', 'darkviolet', 'deeppink', 'deepskyblue',
                 'dimgray', 'dimgrey', 'dodgerblue', 'firebrick',
