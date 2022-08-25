@@ -4,14 +4,11 @@ from backtesting import Strategy, Backtest
 from backtesting.lib import crossover
 import pandas as pd
 from datetime import datetime,timedelta
-import argparse
 import plotly.express as px 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly.graph_objs.scatter import Line
-import json
-import warnings
-warnings.filterwarnings("ignore")
+
 
 def get_prices(c,start,end):
     if c=='BTC':
@@ -37,26 +34,24 @@ def get_prices(c,start,end):
     })
     return pricedata
 
+
 def make_tg_inds(p,btd,start,end,ranges,thresh_grads):
     # wp = p[start:end] # working prices
     allindics = {}
     for x in ranges:  
         for y in thresh_grads:
             allindics[(x,y)] = (list(p['Close'].pct_change(periods=x)[start:end]),y)
-            
-        
     return allindics
+
 
 def indicator(values):
     return values
 
+
 def add_metrics(_f): 
     _f['1_eq_ch'] = _f['equity'].pct_change() # pct ch with t-1
-    # _f['long_ch'] = _f['equity'].pct_change(periods=5) #pct diff with t-5
     _f['rolling_max'] = [max(_f['equity'].loc[:i]) for i in list(_f.index)]
     _f['rolling_min'] = [min(_f['equity'].loc[:i]) for i in list(_f.index)]
-    
-    # Here need plan for overall 'equity-ness' of the model
     _f['mean_eq'] = [_f['equity'].loc[:i].mean() for i in list(_f.index)]
     _f['sma_eq'] = [_f['equity'].loc[:i].rolling(20).mean()[-1] for i in list(_f.index)]
     _f['ema_eq'] = [_f['equity'].loc[:i].ewm(span=15,adjust=False).mean()[-1] for i in list(_f.index)]
@@ -121,7 +116,7 @@ def threshgrad_opstrat(p,inds,bstart,bend,btd,ranges,thresh_grads,eq):
             method="grid",
             constraint=lambda param: param
         )
-    # breakpoint()
+
     opst = {
         "rng":eval(str(btresult['bt_std']._strategy).split('(')[1].split(',')[0].split('=')[1]),
         "tg":btresult['bt_std']._strategy.tg
@@ -129,39 +124,40 @@ def threshgrad_opstrat(p,inds,bstart,bend,btd,ranges,thresh_grads,eq):
     return opst
 
 def populate_columns(p,inds,opst,eq,start,end):
+    
     wp = p[start:end]
     tg = opst['tg']
     rng = opst['rng']
     data = wp.copy()
     data['tg'] = [tg for _ in range(wp.shape[0])]
     data['rng'] = [rng for _ in range(wp.shape[0])]
-
     data['ind'] = p['Close'].pct_change(periods=rng)[start:end]
     data['test_presignal'] = [None for _ in range(data.shape[0])]
-    newf = pd.DataFrame().reindex_like(data)
+    
     for i,x in data.iterrows():
-        if i==min(data.index):
+        if i == min(data.index):
             x['test_presignal']=0
             data.loc[i] = x
-        elif data.loc[i]['ind']>0 and abs((data.loc[i]['ind'])>tg) and (data.loc[i-timedelta(hours=1)]['test_presignal']!=1):
-            x['test_presignal'] = 1
-            data.loc[i] = x
-        elif data.loc[i]['ind']<0 and abs((data.loc[i]['ind'])>tg) and (data.loc[i-timedelta(hours=1)]['test_presignal']!=-1):
-            x['test_presignal'] = -1
-            data.loc[i] = x
         else:
-            x['test_presignal'] =0
-            data.loc[i] = x
-            
-    data['presignal'] = [0 if x==0 else 1 if (data.iloc[x]['ind']>0 and abs((data.iloc[x]['ind'])>tg))
-                         else -1 if  (data.iloc[x]['ind']<0 and abs((data.iloc[x]['ind'])>tg))
+            if abs(data.loc[i]['ind']) < tg:
+                x['test_presignal'] = 0
+            elif abs(data.loc[i]['ind']) > tg and data.loc[i]['ind']>0:
+                x['test_presignal']=1
+                data.loc[i] = x
+            elif abs(data.loc[i]['ind']) > tg and data.loc[i]['ind']<0:
+                x['test_presignal']=-1
+                data.loc[i] = x
+            else:
+                print(i,x)
+
+    data['presignal'] = [0 if x==0 else 1 if (data.iloc[x]['ind']>0 and abs((data.iloc[x]['ind']))>tg)
+                         else -1 if  (data.iloc[x]['ind']<0 and abs((data.iloc[x]['ind']))>tg)
                          else 0 for x in range(data.shape[0])]
     
         
     posdf = data[data['presignal']!=0]
     data['signal'] = data['presignal'].replace(to_replace=0,method="ffill")
     data['test_signal'] = data['test_presignal'].replace(to_replace=0,method="ffill")
-    # breakpoint()
     data['equity'] =  [None for _ in range(wp.shape[0])]
     data['pct_ch'] = data['Close'].pct_change()
     
@@ -186,7 +182,6 @@ def populate_columns(p,inds,opst,eq,start,end):
                 print(e)
                 
     _f = add_metrics(_f)
-    
     return _f,posdf
 
 
@@ -206,7 +201,7 @@ def tgmain(c,md,btd,mdd):
     inds = make_tg_inds(p,btd,istart,iend,ranges,thresh_grads)
     opst = threshgrad_opstrat(p,inds,istart,iend,btd,ranges,thresh_grads,eq)
     data,posdf = populate_columns(p,inds,opst,eq,iend,M_end)
-    # breakpoint()
+
     bigpos = pd.DataFrame()
     bigpos = pd.concat([bigpos,posdf])
     f = pd.DataFrame().reindex_like(data)
@@ -215,18 +210,16 @@ def tgmain(c,md,btd,mdd):
     total_area = 0
     maxeq = 0
     i = min(f.index)
+    
+    
     while i != max(f.index): 
         maxeq = max(maxeq,data.loc[i]['equity'])
-        total_area = total_area + (maxeq - data.loc[i]['equity'])
-        # total_area = total_area + (data.loc[i]['mean_eq'] - data.loc[i]['equity'])
-
-        print(maxeq,total_area,data.loc[i]['equity'])
-        
+        total_area = total_area + (maxeq - data.loc[i]['equity'])        
         if maxeq==data.loc[i]['rolling_min']==data.loc[i]['equity']:
             f.loc[i] = data.loc[i]
-        # or data.loc[i]['equity'] < data.loc[i]['rolling_max'] * 0.975
+       
         if total_area > mdd:
-            # p,inds,bstart,bend,btd,ranges,thresh_grads
+          
             opst = threshgrad_opstrat(
                 p,
                 inds,
@@ -238,7 +231,6 @@ def tgmain(c,md,btd,mdd):
                 data.loc[i]['equity']
                 )
             outstrat[i] = opst
-            # p,inds,opst,eq,start,end
             data,posdf = populate_columns(
                 p,
                 inds,
@@ -250,8 +242,7 @@ def tgmain(c,md,btd,mdd):
         
             bigpos = pd.concat([bigpos,posdf])
             f.loc[i:] = data.loc[i:]
-            # The problem is that rolling max is not the rolling max of the entire sytem
-            # f = add_metrics(f)
+
             total_area = 0 # reset area to 0
             maxeq = 0
 
@@ -264,7 +255,6 @@ def tgmain(c,md,btd,mdd):
 
     bigpos['colour'] = ['blue' if x==1 else 'yellow' if x==-1 else None for x in list(bigpos.presignal)]
     bigpos['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(bigpos.presignal)]    
-    # breakpoint()
     return f,outstrat,bigpos
 
 

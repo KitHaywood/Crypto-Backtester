@@ -207,63 +207,15 @@ def populate_columns(p,opst,eq,start,end,ind,pracc):
     _f['hwm'] = [max(_f['equity'].loc[:i]) for i in list(_f.index)]
     return _f,posdf
     
-
-def plot(c,data,opst,outstrat,posdf):
-
-    pricetc = go.Scatter(x=data.index,y=data['Close'],line = Line({'color': 'rgb(0, 0, 128)', 'width': 1}),name='Price')
-    # sigtc = px.Scatter(posdf,x='datetime',y='signal',symbol_sequence=['triangle-up','triangle-down'],name='signal')
-    eqtc = go.Scatter(x=data.index,y=data['equity'],line = Line({'color': 'darkblue', 'width': 1}),name='equity')
-    eqtc2 = go.Scatter(x=data.index,y=data['ema_eq'],line = Line({'color': 'red', 'width': 1}),name='EMA')
-    eqtc3 = go.Scatter(x=data.index,y=data['sma_eq'],line = Line({'color': 'blue', 'width': 1}),name='SMA')
-    eqtc4 = go.Scatter(x=data.index,y=data['mean_eq'],line = Line({'color': 'green', 'width': 1}),name="MEAN")
-    eqtc5 = go.Scatter(x=data.index,y=data['rolling_max'],line = Line({'color': 'orange', 'width': 1}),name='Roll Max')
-    eqtc6 = go.Scatter(x=data.index,y=data['rolling_min'],line = Line({'color': 'magenta', 'width': 1}),name='Roll Min')
-    sigtc = go.Scatter(
-        mode='markers',
-        x=posdf.index,
-        y=posdf['Close'],
-        marker=dict(size=10,symbol=[5,6],color=['red','green']),
-        name='Signal')
-    acctc = go.Scatter(x=data.index,y=data['accs'],line=Line({'color': 'red', 'width': 1}),name='Acc')
-    gradtc = go.Scatter(x=data.index,y=data['grads'],line=Line({'color': 'blue', 'width': 1}),name='Grad')
-    data1 = [pricetc,sigtc]
-    data2 = [eqtc,eqtc2,eqtc3,eqtc4,eqtc5,eqtc6]
-    data4 = [acctc,gradtc]
-    fig = make_subplots(rows=3, cols=1,shared_xaxes=True,subplot_titles=("Price + Signal","Equity + Measures",f"Indicators"))
-    fig.add_traces(data1, rows=1, cols=1)
-    fig.add_traces(data2, rows=2, cols=1)
-    fig.add_traces(data4,rows=3,cols=1)
-    ivls = list(outstrat.keys()) # these are intervals
-    ivls.append(datetime.today().replace(minute=0,second=0,microsecond=0))
-    colours = ['blue','green','red','orange','purple','blue','darkgreen','skyblue']
-    for i in range(1,len(ivls)):
-        try:
-            fig.add_vrect(
-                x0=ivls[i-1].isoformat(sep=" "),
-                x1=ivls[i].isoformat(sep=" "),
-                annotation_text='/'.join([str(outstrat[ivls[i-1]]['win']),str(outstrat[ivls[i-1]]['deg'])]),
-                annotation_position='top left',
-                fillcolor=colours[i-1],
-                opacity=0.1,
-                line_width=0
-            )
-        except IndexError:
-            breakpoint()
-    fig.update_layout(title_text=f'{c} - Out-of-Sample 1-Opter Backtest - depth {md} hrs - {btd} 750 hrs - {max_trade} - 20')  
-    fig.show()
-    return fig
-
-def indix_main(c,md,btd,mt,pracc,mdd):
+def indix_main(c,md,btd,mt,pracc,mdd,ind):
     M_end = datetime.today().replace(minute=0,second=0,microsecond=0)
     M_start = M_end - timedelta(hours=md+btd)
-    print(M_end,M_start)
     eq = 100000
     
-    
-    # p is always full p dont change
+
     p = prices(c,M_start,M_end) # (1) Load Prices - here p is [btd+md]
-    ind,ws,ds = all_indics(c,M_start,M_end) # (2) inds required for (2)
-    
+    ws = list(range(100,1600,100)) # (2) inds required for (2)
+    ds = list(range(4,17))
     
     # Sort starts and ends properly here
     istart = M_start
@@ -279,7 +231,8 @@ def indix_main(c,md,btd,mt,pracc,mdd):
         ds, # degrees
         mt, # max trades
         pracc # preceding acceleration depth
-        ) # (2) opstr
+        ) 
+    
     # M_end is major end, iend is the end of the initial backtest
     bigpos = pd.DataFrame()
     data,posdf = populate_columns(p,opst,eq,iend,M_end,ind,pracc)
@@ -292,15 +245,13 @@ def indix_main(c,md,btd,mt,pracc,mdd):
     total_area = 0
         
     while i != max(f.index): 
-        
-        # maxeq = max(maxeq,data.loc[i]['equity'])
+
         total_area = total_area + (data.loc[i]['mean_eq'] - data.loc[i]['equity'])
 
         print(maxeq,total_area,data.loc[i]['equity'])
         
         if maxeq==data.loc[i]['rolling_min']==data.loc[i]['equity']:
             f.loc[i] = data.loc[i]
-        # or data.loc[i]['equity'] < data.loc[i]['rolling_max'] * 0.975
         if total_area > mdd :
 
             opst = opstrat(p,ind,i-timedelta(hours=btd),i,btd,data.loc[i]['equity'],ws,ds,mt,pracc)
@@ -317,8 +268,6 @@ def indix_main(c,md,btd,mt,pracc,mdd):
         
             bigpos = pd.concat([bigpos,posdf])
             f.loc[i:] = data.loc[i:]
-            # The problem is that rolling max is not the rolling max of the entire sytem
-            # f = add_metrics(f)
             total_area = 0 # reset area to 0
             maxeq = 0
 
@@ -328,10 +277,6 @@ def indix_main(c,md,btd,mt,pracc,mdd):
         i = i+timedelta(hours=1)
         
     f = add_metrics(f)
-
-
-
-
     bigpos['colour'] = ['gold' if x==1 else 'grey' if x==-1 else None for x in list(bigpos.presignal)]
     bigpos['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(bigpos.presignal)]
     return f,opst,outstrat,bigpos

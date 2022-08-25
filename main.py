@@ -11,8 +11,8 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from signaller2 import *
-from tg_signaller import *
+from zero_sig import *
+from tg_sig import *
 from sma_sig import *
 import json
 from dash import dcc
@@ -34,7 +34,7 @@ app = dash_app.server
     prevent_initial_call=True
 )
 def get_data(n,c,btd,md,mdd,mt,pracc):
-    data0,opst,outstrat0,posdf0 = main(
+    data0,opst,outstrat0,posdf0,ind = main(
         c=c,
         md=md,
         btd=btd,
@@ -42,23 +42,20 @@ def get_data(n,c,btd,md,mdd,mt,pracc):
         pracc=pracc,
         mdd=mdd
         )
-    print('done Zero-X')
     datatg,outstrattg,posdftg = tgmain(
         c=c,
         md=md,
         btd=btd,
         mdd=mdd
     )
-    
-    print('done tg')
-    
     datai,opsti,outstrati,posdfi = indix_main(
         c=c,
         md=md,
         btd=btd,
         mt=mt,
         pracc=pracc,
-        mdd=mdd
+        mdd=mdd,
+        ind=ind
         )
     newout0 = {}
     newoutg = {}
@@ -74,6 +71,7 @@ def get_data(n,c,btd,md,mdd,mt,pracc):
         newk = dt.datetime.strftime(k,"%Y-%m-%d %H:%M:%S")
         newouti[newk] = v
         
+    # sort output formats into json    
     iprices0 = data0.to_json(date_format='iso', orient='split')
     posdf0 = posdf0.to_json(date_format='iso', orient='split')
     outstrat0 = json.dumps(newout0,default=str)
@@ -83,7 +81,11 @@ def get_data(n,c,btd,md,mdd,mt,pracc):
     ipricesi = datai.to_json(date_format='iso', orient='split')
     posdfi = posdfi.to_json(date_format='iso', orient='split')
     outstrati = json.dumps(newouti,default=str)
+    
+    
     return iprices0,posdf0,outstrat0,ipricestg,posdftg,outstrattg,ipricesi,posdfi,outstrati,""
+
+
 
 @dash_app.callback(
     [Output('mygraph1','figure'),Output('mygraph2','figure')],
@@ -159,7 +161,7 @@ def grapher(data0,posdf0,outstrat0,datatg,posdftg,outstratg,datai,posdfi,outstra
             marker = dict(size = 15, color = posdfi['colour'], symbol = posdfi['symbol'])
         )
     else:
-        sigtc9i = go.Scatter()
+        sigtci = go.Scatter()
         
     eqtc0 = go.Scatter(x=data0.index,y=data0['equity'],line = Line({'color': 'darkblue', 'width': 1}),name='0-equity')
     eqtctg = go.Scatter(x=datatg.index,y=datatg['equity'],line = Line({'color': 'darkgreen', 'width': 1}),name='tg-equity')

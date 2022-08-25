@@ -156,11 +156,10 @@ def opstrat(p,ind,bstart,bend,btd,eq,wins,degs,mt,pracc):
 
 def add_metrics(_f): 
     _f['1_eq_ch'] = _f['equity'].pct_change() # pct ch with t-1
-    # _f['long_ch'] = _f['equity'].pct_change(periods=5) #pct diff with t-5
     _f['rolling_max'] = [max(_f['equity'].loc[:i]) for i in list(_f.index)]
     _f['rolling_min'] = [min(_f['equity'].loc[:i]) for i in list(_f.index)]
-    
-    # Here need plan for overall 'equity-ness' of the model
+
+
     _f['mean_eq'] = [_f['equity'].loc[:i].mean() for i in list(_f.index)]
     _f['sma_eq'] = [_f['equity'].loc[:i].rolling(20).mean()[-1] for i in list(_f.index)]
     _f['ema_eq'] = [_f['equity'].loc[:i].ewm(span=15,adjust=False).mean()[-1] for i in list(_f.index)]
@@ -187,9 +186,8 @@ def populate_columns(p,opst,eq,start,end,ind,pracc):
                         else 0 for x in range(data.shape[0])]
         
     posdf = data[data['presignal']!=0]
-    # breakpoint()
     data['signal'] = data['presignal'].replace(to_replace=0,method="ffill")
-    # breakpoint()
+
     data['equity'] =  [None for _ in range(p.shape[0])]
     data['pct_ch'] = data['Close'].pct_change()
     
@@ -214,56 +212,7 @@ def populate_columns(p,opst,eq,start,end,ind,pracc):
                 print(e)
                 
     _f = add_metrics(_f)
-    _f['hwm'] = [max(_f['equity'].loc[:i]) for i in list(_f.index)]
-    # breakpoint()
-    return _f,posdf
-    
-
-def plot(c,data,opst,outstrat,posdf):
-
-    pricetc = go.Scatter(x=data.index,y=data['Close'],line = Line({'color': 'rgb(0, 0, 128)', 'width': 1}),name='Price')
-    # sigtc = px.Scatter(posdf,x='datetime',y='signal',symbol_sequence=['triangle-up','triangle-down'],name='signal')
-    eqtc = go.Scatter(x=data.index,y=data['equity'],line = Line({'color': 'darkblue', 'width': 1}),name='equity')
-    eqtc2 = go.Scatter(x=data.index,y=data['ema_eq'],line = Line({'color': 'red', 'width': 1}),name='EMA')
-    eqtc3 = go.Scatter(x=data.index,y=data['sma_eq'],line = Line({'color': 'blue', 'width': 1}),name='SMA')
-    eqtc4 = go.Scatter(x=data.index,y=data['mean_eq'],line = Line({'color': 'green', 'width': 1}),name="MEAN")
-    eqtc5 = go.Scatter(x=data.index,y=data['rolling_max'],line = Line({'color': 'orange', 'width': 1}),name='Roll Max')
-    eqtc6 = go.Scatter(x=data.index,y=data['rolling_min'],line = Line({'color': 'magenta', 'width': 1}),name='Roll Min')
-    sigtc = go.Scatter(
-        mode='markers',
-        x=posdf.index,
-        y=posdf['Close'],
-        marker=dict(size=10,symbol=[5,6],color=['red','green']),
-        name='Signal')
-    acctc = go.Scatter(x=data.index,y=data['accs'],line=Line({'color': 'red', 'width': 1}),name='Acc')
-    gradtc = go.Scatter(x=data.index,y=data['grads'],line=Line({'color': 'blue', 'width': 1}),name='Grad')
-    data1 = [pricetc,sigtc]
-    data2 = [eqtc,eqtc2,eqtc3,eqtc4,eqtc5,eqtc6]
-    data4 = [acctc,gradtc]
-    fig = make_subplots(rows=3, cols=1,shared_xaxes=True,subplot_titles=("Price + Signal","Equity + Measures",f"Indicators"))
-    fig.add_traces(data1, rows=1, cols=1)
-    fig.add_traces(data2, rows=2, cols=1)
-    fig.add_traces(data4,rows=3,cols=1)
-    ivls = list(outstrat.keys()) # these are intervals
-    ivls.append(datetime.today().replace(minute=0,second=0,microsecond=0))
-    colours = ['blue','green','red','orange','purple','blue','darkgreen','skyblue']
-    # breakpoint()
-    for i in range(1,len(ivls)):
-        try:
-            fig.add_vrect(
-                x0=ivls[i-1].isoformat(sep=" "),
-                x1=ivls[i].isoformat(sep=" "),
-                annotation_text='/'.join([str(outstrat[ivls[i-1]]['win']),str(outstrat[ivls[i-1]]['deg'])]),
-                annotation_position='top left',
-                fillcolor=colours[i-1],
-                opacity=0.1,
-                line_width=0
-            )
-        except IndexError:
-            breakpoint()
-    fig.update_layout(title_text=f'{c} - Out-of-Sample 1-Opter Backtest - depth {md} hrs - {btd} 750 hrs - {max_trade} - 20')  
-    fig.show()
-    return fig
+    return _f,posdf   
 
 def main(c,md,btd,mt,pracc,mdd):
     M_end = datetime.today().replace(minute=0,second=0,microsecond=0)
@@ -305,14 +254,10 @@ def main(c,md,btd,mt,pracc,mdd):
         
     while i != max(f.index): 
         
-        # maxeq = max(maxeq,data.loc[i]['equity'])
-        total_area = total_area + (data.loc[i]['mean_eq'] - data.loc[i]['equity'])
-
-        print(maxeq,total_area,data.loc[i]['equity'])
-        
+        total_area = total_area + (data.loc[i]['mean_eq'] - data.loc[i]['equity'])        
         if maxeq==data.loc[i]['rolling_min']==data.loc[i]['equity']:
             f.loc[i] = data.loc[i]
-        # or data.loc[i]['equity'] < data.loc[i]['rolling_max'] * 0.975
+
         if total_area > mdd :
 
             opst = opstrat(p,ind,i-timedelta(hours=btd),i,btd,data.loc[i]['equity'],ws,ds,mt,pracc)
@@ -329,8 +274,6 @@ def main(c,md,btd,mt,pracc,mdd):
         
             bigpos = pd.concat([bigpos,posdf])
             f.loc[i:] = data.loc[i:]
-            # The problem is that rolling max is not the rolling max of the entire sytem
-            # f = add_metrics(f)
             total_area = 0 # reset area to 0
             maxeq = 0
 
@@ -346,7 +289,7 @@ def main(c,md,btd,mt,pracc,mdd):
 
     bigpos['colour'] = ['green' if x==1 else 'red' if x==-1 else None for x in list(bigpos.presignal)]
     bigpos['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(bigpos.presignal)]
-    return f,opst,outstrat,bigpos
+    return f,opst,outstrat,bigpos,ind
 
 
 if __name__=="__main__":
