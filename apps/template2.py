@@ -7,9 +7,17 @@ def app_layout():
     return html.Div(style = {
         'backgroundColor':'white'
     },children=[
-        dcc.Store(id='iprices-data'),
-        dcc.Store(id='posdf-data'),
-        dcc.Store(id='outstrat-data'),
+        dcc.Store(id='0-iprices-data'),
+        dcc.Store(id='0-posdf-data'),
+        dcc.Store(id='inds'),
+        dcc.Store(id='0-outstrat-data'),
+        dcc.Store(id='tg-iprices-data'),
+        dcc.Store(id='tg-posdf-data'),
+        dcc.Store(id='tg-outstrat-data'),
+        dcc.Store(id='indix-iprices-data'),
+        dcc.Store(id='indix-posdf-data'),
+        dcc.Store(id='indix-outstrat-data'),
+        
         html.H1(children='Zero-X Model',
         style={'textAlign':'center','color':'black'}),
         html.Div(className='row',children=[
@@ -19,7 +27,7 @@ def app_layout():
                     dcc.Dropdown(
                     id='crypto-selector',
                     options=['REP','XLM','BTC'],
-                    value='REP'),
+                    value='BTC'),
                 html.Label(['Select In-Samp Backtest Depth'],style={'text-align':'left','color':'black'}),
                     dcc.Input(
                     id='btd-input',
@@ -32,11 +40,11 @@ def app_layout():
                     id='md-input',
                     type='number',
                     placeholder="input an integer",
-                    value=1000),
+                    value=2000),
                 html.Label(['Select Area'],style={'text-align':'left','color':'black'}),
                     dcc.Input(
                     id='mdd-input',
-                    value=250000,
+                    value=500000,
                     type='number',
                     placeholder="input [0.0 -- 1.0]")
         ]),
@@ -79,7 +87,8 @@ def app_layout():
             html.Div()
                 ]
             ),
-        html.Div(children=dcc.Graph(id='mygraph')),
+        html.Div(children=dcc.Graph(id='mygraph1')),
+        html.Div(children=dcc.Graph(id='mygraph2')),
         html.Button("Dump Price-Equity CSV",id='downlink'),
         html.Button("Dump Posdf CSV",id='posdf-downlink'),
         dcc.Download(id='dl-df'),

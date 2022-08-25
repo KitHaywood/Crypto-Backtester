@@ -63,7 +63,7 @@ def add_metrics(_f):
     return _f
 
 
-def threshgrad_opstrat(p,c,inds,bstart,bend,btd,ranges,thresh_grads):
+def threshgrad_opstrat(p,inds,bstart,bend,btd,ranges,thresh_grads,eq):
     
     p = p[bstart:bend]
 
@@ -109,7 +109,7 @@ def threshgrad_opstrat(p,c,inds,bstart,bend,btd,ranges,thresh_grads):
     bt_std = Backtest(
             p,
             GradientModel,
-            cash=1_000_000,
+            cash=eq,
             commission=0.002
             )
     btresult = {}
@@ -130,23 +130,38 @@ def threshgrad_opstrat(p,c,inds,bstart,bend,btd,ranges,thresh_grads):
 
 def populate_columns(p,inds,opst,eq,start,end):
     wp = p[start:end]
-    print('wp',wp.shape)
     tg = opst['tg']
     rng = opst['rng']
     data = wp.copy()
-    print('data',data.shape)
     data['tg'] = [tg for _ in range(wp.shape[0])]
     data['rng'] = [rng for _ in range(wp.shape[0])]
-    # breakpoint()
-    data['ind'] = p['Close'].pct_change(periods=rng)[start:end]
-    breakpoint()
 
+    data['ind'] = p['Close'].pct_change(periods=rng)[start:end]
+    data['test_presignal'] = [None for _ in range(data.shape[0])]
+    newf = pd.DataFrame().reindex_like(data)
+    for i,x in data.iterrows():
+        if i==min(data.index):
+            x['test_presignal']=0
+            data.loc[i] = x
+        elif data.loc[i]['ind']>0 and abs((data.loc[i]['ind'])>tg) and (data.loc[i-timedelta(hours=1)]['test_presignal']!=1):
+            x['test_presignal'] = 1
+            data.loc[i] = x
+        elif data.loc[i]['ind']<0 and abs((data.loc[i]['ind'])>tg) and (data.loc[i-timedelta(hours=1)]['test_presignal']!=-1):
+            x['test_presignal'] = -1
+            data.loc[i] = x
+        else:
+            x['test_presignal'] =0
+            data.loc[i] = x
+            
     data['presignal'] = [0 if x==0 else 1 if (data.iloc[x]['ind']>0 and abs((data.iloc[x]['ind'])>tg))
                          else -1 if  (data.iloc[x]['ind']<0 and abs((data.iloc[x]['ind'])>tg))
                          else 0 for x in range(data.shape[0])]
+    
         
     posdf = data[data['presignal']!=0]
     data['signal'] = data['presignal'].replace(to_replace=0,method="ffill")
+    data['test_signal'] = data['test_presignal'].replace(to_replace=0,method="ffill")
+    # breakpoint()
     data['equity'] =  [None for _ in range(wp.shape[0])]
     data['pct_ch'] = data['Close'].pct_change()
     
@@ -175,32 +190,90 @@ def populate_columns(p,inds,opst,eq,start,end):
     return _f,posdf
 
 
-def main(c,md,btd,eq):
+def tgmain(c,md,btd,mdd):
 
-    
+    eq = 100000
     ranges = list(range(100,400,20)) # make argparse
     thresh_grads = [round(x,4) for x in list(np.arange(0.01,0.05,0.0025))]
 
     M_end = datetime.today().replace(minute=0,second=0,microsecond=0) # Major End dt
     M_start = M_end-timedelta(hours=md+btd+max(ranges)) # Major start dt (md+btd+max_range)
-    bend = M_start+timedelta(hours=(btd+max(ranges))) # BT End
-    bstart = M_start+timedelta(hours=max(ranges))  # BT Start
+    iend = M_start+timedelta(hours=(btd+max(ranges))) # BT End
+    istart = M_start+timedelta(hours=max(ranges))  # BT Start
 
     
     p = get_prices(c,M_start,M_end)    
-    inds = make_tg_inds(p,btd,bstart,bend,ranges,thresh_grads)
-    opst = threshgrad_opstrat(p,c,inds,bstart,bend,btd,ranges,thresh_grads)
-    data,posdf = populate_columns(p,inds,opst,eq,bend,M_end)
+    inds = make_tg_inds(p,btd,istart,iend,ranges,thresh_grads)
+    opst = threshgrad_opstrat(p,inds,istart,iend,btd,ranges,thresh_grads,eq)
+    data,posdf = populate_columns(p,inds,opst,eq,iend,M_end)
+    # breakpoint()
+    bigpos = pd.DataFrame()
+    bigpos = pd.concat([bigpos,posdf])
+    f = pd.DataFrame().reindex_like(data)
+    outstrat = {}
+    outstrat[iend] = opst
+    total_area = 0
+    maxeq = 0
+    i = min(f.index)
+    while i != max(f.index): 
+        maxeq = max(maxeq,data.loc[i]['equity'])
+        total_area = total_area + (maxeq - data.loc[i]['equity'])
+        # total_area = total_area + (data.loc[i]['mean_eq'] - data.loc[i]['equity'])
 
-    return data
+        print(maxeq,total_area,data.loc[i]['equity'])
+        
+        if maxeq==data.loc[i]['rolling_min']==data.loc[i]['equity']:
+            f.loc[i] = data.loc[i]
+        # or data.loc[i]['equity'] < data.loc[i]['rolling_max'] * 0.975
+        if total_area > mdd:
+            # p,inds,bstart,bend,btd,ranges,thresh_grads
+            opst = threshgrad_opstrat(
+                p,
+                inds,
+                i-timedelta(hours=btd),
+                i,
+                btd,
+                ranges,
+                thresh_grads,
+                data.loc[i]['equity']
+                )
+            outstrat[i] = opst
+            # p,inds,opst,eq,start,end
+            data,posdf = populate_columns(
+                p,
+                inds,
+                opst,
+                data.loc[i]['equity'],
+                i,
+                M_end,
+                )
+        
+            bigpos = pd.concat([bigpos,posdf])
+            f.loc[i:] = data.loc[i:]
+            # The problem is that rolling max is not the rolling max of the entire sytem
+            # f = add_metrics(f)
+            total_area = 0 # reset area to 0
+            maxeq = 0
+
+        else:
+            f.loc[i] = data.loc[i]
+            
+        i = i+timedelta(hours=1)
+        
+    f = add_metrics(f)
+
+    bigpos['colour'] = ['blue' if x==1 else 'yellow' if x==-1 else None for x in list(bigpos.presignal)]
+    bigpos['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(bigpos.presignal)]    
+    # breakpoint()
+    return f,outstrat,bigpos
 
 
 if __name__=="__main__":
     c = 'XLM'
     md = 2000
     btd = 500
-    eq = 1000000
-    data = main(c,md,btd,eq)
+    mdd = 500000
+    data = tgmain(c,md,btd,mdd)
 
     
 

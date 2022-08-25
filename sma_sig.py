@@ -93,41 +93,29 @@ def opstrat(p,ind,bstart,bend,btd,eq,wins,degs,mt,pracc):
         Optimal Strat Shape - [w , d]        
         """
         allindics = nind
-        wind = 800
-        deg = 4
+        wind1 = 800
+        deg1 = 4
+        wind2 = 200
+        deg2 = 12
 
         def init(self):
             self.grad = self.I(
-                    indicator, 
-                    self.allindics[self.wind][self.deg].grads
-                    )
+                indicator, 
+                self.allindics[self.wind1][self.deg1].grads
+                )
             self.acc = self.I(
                 indicator,
-                self.allindics[self.wind][self.deg].accs
-                ) 
-            self.zeros = self.I(
-                indicator,
-                np.zeros(len(self.data.Close))
+                self.allindics[self.wind2][self.deg2].accs
                 )
 
         def next(self):
-            if pracc==0:
-                if (self.grad > 0) & all(self.acc > 0) & (self.grad[-2] < 0): 
-                    self.position.close()
-                    self.buy()
+            if crossover(self.grad,self.acc):
+                self.position.close()
+                self.buy()
 
-                elif (self.grad < 0) & all(self.acc < 0) & (self.acc[-2] > 0): 
-                    self.position.close()
-                    self.sell()
-            else:
-                if (self.grad > 0) & all(self.acc[-pracc:] > 0) & (self.grad[-2] < 0): 
-                    self.position.close()
-                    self.buy()
-
-                elif (self.grad < 0) & all(self.acc[-pracc:] < 0) & (self.acc[-2] > 0): 
-                    self.position.close()
-                    self.sell()               
-                
+            elif crossover(self.acc, self.grad): 
+                self.position.close()
+                self.sell()
     bt_std = Backtest(
             p,
             FourierTimStandard,
@@ -142,15 +130,20 @@ def opstrat(p,ind,bstart,bend,btd,eq,wins,degs,mt,pracc):
     
     btr = {}
     btr['bt_std'] = bt_std.optimize(
-            wind=wins,
-            deg=degs,
+            wind1=wins,
+            deg1=degs,
+            wind2=wins,
+            deg2=degs,
             maximize=maximiser,
             method="grid",
+            max_tries=5000,
             constraint=lambda param: param
         )
     opst = {
-        "win":btr['bt_std']._strategy.wind,
-        "deg":btr['bt_std']._strategy.deg
+        "win1":btr['bt_std']._strategy.wind1,
+        "deg1":btr['bt_std']._strategy.deg1,
+        "win2":btr['bt_std']._strategy.wind2,
+        "deg2":btr['bt_std']._strategy.deg2
     }
     return opst
 
@@ -168,28 +161,25 @@ def add_metrics(_f):
 
 def populate_columns(p,opst,eq,start,end,ind,pracc):
     p = p[start:end]
-    w = opst['win']
-    d = opst['deg']
-    s_ind = ind[w][d] # indicator df at w & d
+    w1 = opst['win1']
+    w2 = opst['win2']
+    d1 = opst['deg1']
+    d2 = opst['deg2']
+    s_ind1 = ind[w1][d2] # indicator df at w & d
+    s_ind2 = ind[w1][d2] # indicator df at w & d
     data = p.copy()
-    data['win'] = [w for _ in range(p.shape[0])]
-    data['deg'] = [d for _ in range(p.shape[0])]
-    data['accs'] = s_ind.grads
-    data['grads'] = s_ind.accs
+    data['win1'] = [w1 for _ in range(p.shape[0])]
+    data['win2'] = [w2 for _ in range(p.shape[0])]
+    data['deg1'] = [d1 for _ in range(p.shape[0])]
+    data['deg2'] = [d2 for _ in range(p.shape[0])]
+    data['accs'] = s_ind1.accs
+    data['grads'] = s_ind2.grads
 
-    if pracc==0:
-        data['presignal'] = [0 if x==0 else 1 if (data.iloc[x]['accs']>0 and data.iloc[x-1]['grads']<0 and data.iloc[x]['grads']>0)
-                        else -1 if (data.iloc[x]['accs']<0 and data.iloc[x-1]['grads']>0 and data.iloc[x]['grads']<0)
-                        else 0 for x in range(data.shape[0])]
-    else:
-        data['presignal'] = [0 if x==0 else 1 if (all(data.iloc[x-pracc:]['accs']>0) and data.iloc[x-1]['grads']<0 and data.iloc[x]['grads']>0)
-                        else -1 if (all(data.iloc[x-pracc:]['accs']<0) and data.iloc[x-1]['grads']>0 and data.iloc[x]['grads']<0)
-                        else 0 for x in range(data.shape[0])]
-        
+    data['presignal'] = [0 if x==0 else 1 if ((data.iloc[x-1]['grads'] < data.iloc[x-1]['accs']) and (data.iloc[x]['grads'] > data.iloc[x]['accs']))
+                         else -1 if ((data.iloc[x-1]['grads'] > data.iloc[x-1]['accs']) and (data.iloc[x]['grads'] < data.iloc[x]['accs']))
+                         else 0 for x in range(data.shape[0])]        
     posdf = data[data['presignal']!=0]
-    # breakpoint()
     data['signal'] = data['presignal'].replace(to_replace=0,method="ffill")
-    # breakpoint()
     data['equity'] =  [None for _ in range(p.shape[0])]
     data['pct_ch'] = data['Close'].pct_change()
     
@@ -215,7 +205,6 @@ def populate_columns(p,opst,eq,start,end,ind,pracc):
                 
     _f = add_metrics(_f)
     _f['hwm'] = [max(_f['equity'].loc[:i]) for i in list(_f.index)]
-    # breakpoint()
     return _f,posdf
     
 
@@ -247,7 +236,6 @@ def plot(c,data,opst,outstrat,posdf):
     ivls = list(outstrat.keys()) # these are intervals
     ivls.append(datetime.today().replace(minute=0,second=0,microsecond=0))
     colours = ['blue','green','red','orange','purple','blue','darkgreen','skyblue']
-    # breakpoint()
     for i in range(1,len(ivls)):
         try:
             fig.add_vrect(
@@ -265,7 +253,7 @@ def plot(c,data,opst,outstrat,posdf):
     fig.show()
     return fig
 
-def main(c,md,btd,mt,pracc,mdd):
+def indix_main(c,md,btd,mt,pracc,mdd):
     M_end = datetime.today().replace(minute=0,second=0,microsecond=0)
     M_start = M_end - timedelta(hours=md+btd)
     print(M_end,M_start)
@@ -344,7 +332,7 @@ def main(c,md,btd,mt,pracc,mdd):
 
 
 
-    bigpos['colour'] = ['green' if x==1 else 'red' if x==-1 else None for x in list(bigpos.presignal)]
+    bigpos['colour'] = ['gold' if x==1 else 'grey' if x==-1 else None for x in list(bigpos.presignal)]
     bigpos['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(bigpos.presignal)]
     return f,opst,outstrat,bigpos
 
@@ -355,7 +343,7 @@ if __name__=="__main__":
     parser.add_argument(
         '--out',
         type=str,
-        required=True,
+        required=False,
         help='choose either plotly/csv/json'
     )
     parser.add_argument(
@@ -402,8 +390,8 @@ if __name__=="__main__":
     if args.max_drawdowndepth:
         pass
     else:
-        args.max_drawdowndepth = 0.975
-    print(args)
+        args.max_drawdowndepth = 250000
+    # print(args)
     global max_trades,btd,md,mdd
     pracc = 0
     max_trades = 10
@@ -411,27 +399,29 @@ if __name__=="__main__":
     btd = args.bt_depth # backtest depth
     md = args.depth # backtest depth
     mdd = args.max_drawdowndepth
-    data,opst,outstrat,posdf = main(
+    # c,md,btd,mt,pracc,mdd
+    data,opst,outstrat,posdf = indix_main(
         c=c,
         md=md, # model depth (what is plotted)
         btd=btd, # backtest depth,
+        mt=max_trades,
         pracc=pracc,
         mdd=mdd
     )
 
-    class PdEncoder(json.JSONEncoder):
-        def default(self, obj):
-            if isinstance(obj, pd.Timestamp):
-                return str(obj)
-            return json.JSONEncoder.default(self, obj)
+    # class PdEncoder(json.JSONEncoder):
+    #     def default(self, obj):
+    #         if isinstance(obj, pd.Timestamp):
+    #             return str(obj)
+    #         return json.JSONEncoder.default(self, obj)
     
-    csvpath = os.path.join(os.getcwd(),f'output_{c}_{datetime.today().replace(minute=0,second=0,microsecond=0).isoformat(sep="T")}.csv')
-    jsonpath = os.path.join(os.getcwd(),f'output{c}_{datetime.today().replace(minute=0,second=0,microsecond=0).isoformat(sep="T")}.json')
-    if args.out=='json':
-        with open(jsonpath,'w') as f_out:
-            json.dump(data.to_dict(orient='records'),f_out,cls=PdEncoder)
-    elif args.out=='csv':
-        data.to_csv(csvpath)
-    elif args.out=='plotly':
-        fig = plot(c,data,opst,outstrat,posdf)
+    # csvpath = os.path.join(os.getcwd(),f'output_{c}_{datetime.today().replace(minute=0,second=0,microsecond=0).isoformat(sep="T")}.csv')
+    # jsonpath = os.path.join(os.getcwd(),f'output{c}_{datetime.today().replace(minute=0,second=0,microsecond=0).isoformat(sep="T")}.json')
+    # if args.out=='json':
+    #     with open(jsonpath,'w') as f_out:
+    #         json.dump(data.to_dict(orient='records'),f_out,cls=PdEncoder)
+    # elif args.out=='csv':
+    #     data.to_csv(csvpath)
+    # elif args.out=='plotly':
+    #     fig = plot(c,data,opst,outstrat,posdf)
     breakpoint()
