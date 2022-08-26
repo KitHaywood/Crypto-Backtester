@@ -154,13 +154,12 @@ def populate_columns(p,inds,opst,eq,start,end):
                          else -1 if  (data.iloc[x]['ind']<0 and abs((data.iloc[x]['ind']))>tg)
                          else 0 for x in range(data.shape[0])]
     
-        
+    
     posdf = data[data['presignal']!=0]
     data['signal'] = data['presignal'].replace(to_replace=0,method="ffill")
     data['test_signal'] = data['test_presignal'].replace(to_replace=0,method="ffill")
     data['equity'] =  [None for _ in range(wp.shape[0])]
     data['pct_ch'] = data['Close'].pct_change()
-    
     _f = pd.DataFrame().reindex_like(data)
     
     for i,x in data.iterrows():
@@ -195,7 +194,6 @@ def tgmain(c,md,btd,mdd):
     M_start = M_end-timedelta(hours=md+btd+max(ranges)) # Major start dt (md+btd+max_range)
     iend = M_start+timedelta(hours=(btd+max(ranges))) # BT End
     istart = M_start+timedelta(hours=max(ranges))  # BT Start
-
     
     p = get_prices(c,M_start,M_end)    
     inds = make_tg_inds(p,btd,istart,iend,ranges,thresh_grads)
@@ -254,14 +252,18 @@ def tgmain(c,md,btd,mdd):
     f = add_metrics(f)
 
     bigpos['colour'] = ['blue' if x==1 else 'yellow' if x==-1 else None for x in list(bigpos.presignal)]
-    bigpos['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(bigpos.presignal)]    
+    bigpos['symbol'] = ['triangle-up' if x==1 else 'triangle-down' if x==-1 else None for x in list(bigpos.presignal)]  
+      
+    cat = pd.Categorial(list(f.signal),cateogies=[-1,0,1])
+    f['truesig'] = pd.factorize(cat)[0]
+    
     return f,outstrat,bigpos
 
 
 if __name__=="__main__":
     c = 'XLM'
     md = 2000
-    btd = 500
+    btd = 200
     mdd = 500000
     data = tgmain(c,md,btd,mdd)
 

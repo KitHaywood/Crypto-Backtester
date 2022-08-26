@@ -361,20 +361,3 @@ if __name__=="__main__":
         pracc=pracc,
         mdd=mdd
     )
-
-    class PdEncoder(json.JSONEncoder):
-        def default(self, obj):
-            if isinstance(obj, pd.Timestamp):
-                return str(obj)
-            return json.JSONEncoder.default(self, obj)
-    
-    csvpath = os.path.join(os.getcwd(),f'output_{c}_{datetime.today().replace(minute=0,second=0,microsecond=0).isoformat(sep="T")}.csv')
-    jsonpath = os.path.join(os.getcwd(),f'output{c}_{datetime.today().replace(minute=0,second=0,microsecond=0).isoformat(sep="T")}.json')
-    if args.out=='json':
-        with open(jsonpath,'w') as f_out:
-            json.dump(data.to_dict(orient='records'),f_out,cls=PdEncoder)
-    elif args.out=='csv':
-        data.to_csv(csvpath)
-    elif args.out=='plotly':
-        fig = plot(c,data,opst,outstrat,posdf)
-    breakpoint()

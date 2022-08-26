@@ -42,12 +42,14 @@ def get_data(n,c,btd,md,mdd,mt,pracc):
         pracc=pracc,
         mdd=mdd
         )
+    print('got zero-X')
     datatg,outstrattg,posdftg = tgmain(
         c=c,
         md=md,
         btd=btd,
         mdd=mdd
     )
+    print('got - thresh_grad')
     datai,opsti,outstrati,posdfi = indix_main(
         c=c,
         md=md,
@@ -57,6 +59,7 @@ def get_data(n,c,btd,md,mdd,mt,pracc):
         mdd=mdd,
         ind=ind
         )
+    print('got indi-X')
     newout0 = {}
     newoutg = {}
     newouti = {}
@@ -138,7 +141,13 @@ def grapher(data0,posdf0,outstrat0,datatg,posdftg,outstratg,datai,posdfi,outstra
             x=posdf0.index,
             y=posdf0['Close'],
             mode='markers',
-            marker = dict(size = 15, color = posdf0['colour'], symbol = posdf0['symbol'])
+            marker = dict(
+                size = 15,
+                color = posdf0['colour'],
+                symbol = posdf0['symbol'],
+            ),
+            name='zero-sig',
+            legendgroup='1'
         )
     else:
         sigtc0 = go.Scatter()
@@ -148,7 +157,13 @@ def grapher(data0,posdf0,outstrat0,datatg,posdftg,outstratg,datai,posdfi,outstra
             x=posdftg.index,
             y=posdftg['Close'],
             mode='markers',
-            marker = dict(size = 15, color = posdftg['colour'], symbol = posdftg['symbol'])
+            marker = dict(
+                size = 15,
+                color = posdftg['colour'],
+                symbol = posdftg['symbol']
+                ),
+            name='thresh_grad-sig',
+            legendgroup='1'
         )
     else:
         sigtctg = go.Scatter()
@@ -158,25 +173,31 @@ def grapher(data0,posdf0,outstrat0,datatg,posdftg,outstratg,datai,posdfi,outstra
             x=posdfi.index,
             y=posdfi['Close'],
             mode='markers',
-            marker = dict(size = 15, color = posdfi['colour'], symbol = posdfi['symbol'])
+            marker = dict(
+                size = 15,
+                color = posdfi['colour'],
+                symbol = posdfi['symbol']
+                ),
+            name='indix-sig',
+            legendgroup='1'
         )
     else:
         sigtci = go.Scatter()
         
-    eqtc0 = go.Scatter(x=data0.index,y=data0['equity'],line = Line({'color': 'darkblue', 'width': 1}),name='0-equity')
-    eqtctg = go.Scatter(x=datatg.index,y=datatg['equity'],line = Line({'color': 'darkgreen', 'width': 1}),name='tg-equity')
-    eqtci = go.Scatter(x=datai.index,y=datai['equity'],line = Line({'color': 'orange', 'width': 1}),name='sma-equity')
-    eqtc00 = go.Scatter(x=data0.index,y=data0['mean_eq'],line = Line({'color': 'purple', 'width': 1}),name="0-MEAN")
-    eqtctgm = go.Scatter(x=datatg.index,y=datatg['mean_eq'],line = Line({'color': 'red', 'width': 1}),name="tg-MEAN")
-    eqtcti = go.Scatter(x=datatg.index,y=datatg['mean_eq'],line = Line({'color': 'gold', 'width': 1}),name="tg-MEAN")
-    acctc0 = go.Scatter(x=data0.index,y=data0['accs'],line=Line({'color': 'red', 'width': 1}),name='Acc')
-    gradtc0 = go.Scatter(x=data0.index,y=data0['grads'],line=Line({'color': 'blue', 'width': 1}),name='Grad')
-    acctc1 = go.Scatter(x=datai.index,y=datai['accs'],line=Line({'color': 'red', 'width': 1}),name='Acc')
-    gradtc2 = go.Scatter(x=datai.index,y=datai['grads'],line=Line({'color': 'blue', 'width': 1}),name='Grad')
+    eqtc0 = go.Scatter(x=data0.index,y=data0['equity'],line = Line({'color': 'darkblue', 'width': 1}),name='0-equity',legendgroup='2')
+    eqtctg = go.Scatter(x=datatg.index,y=datatg['equity'],line = Line({'color': 'darkgreen', 'width': 1}),name='tg-equity',legendgroup='2')
+    eqtci = go.Scatter(x=datai.index,y=datai['equity'],line = Line({'color': 'orange', 'width': 1}),name='sma-equity',legendgroup='2')
+    eqtc00 = go.Scatter(x=data0.index,y=data0['mean_eq'],line = Line({'color': 'purple', 'width': 1}),name="0-MEAN",legendgroup='2')
+    eqtctgm = go.Scatter(x=datatg.index,y=datatg['mean_eq'],line = Line({'color': 'red', 'width': 1}),name="tg-MEAN",legendgroup='2')
+    eqtcti = go.Scatter(x=datatg.index,y=datatg['mean_eq'],line = Line({'color': 'gold', 'width': 1}),name="tg-MEAN",legendgroup='2')
+    acctc0 = go.Scatter(x=data0.index,y=data0['accs'],line=Line({'color': 'red', 'width': 1}),name='Acc',legendgroup='3')
+    gradtc0 = go.Scatter(x=data0.index,y=data0['grads'],line=Line({'color': 'blue', 'width': 1}),name='Grad',legendgroup='3')
+    acctc1 = go.Scatter(x=datai.index,y=datai['accs'],line=Line({'color': 'red', 'width': 1}),name='Acc',legendgroup='1')
+    gradtc2 = go.Scatter(x=datai.index,y=datai['grads'],line=Line({'color': 'blue', 'width': 1}),name='Grad',legendgroup='1')
     
     data1 = [pricetc0,sigtc0,sigtctg,sigtci]
     data2 = [eqtc0,eqtctg,eqtc00,eqtctgm,eqtci,eqtcti]
-    data4 = [acctc0,gradtc0]
+    data3 = [acctc0,gradtc0]
     
     fig = make_subplots(
         rows=3,
@@ -187,7 +208,7 @@ def grapher(data0,posdf0,outstrat0,datatg,posdftg,outstratg,datai,posdfi,outstra
         )
     fig.add_traces(data1, rows=1, cols=1)
     fig.add_traces(data2, rows=2, cols=1)
-    fig.add_traces(data4,rows=3,cols=1)
+    fig.add_traces(data3,rows=3,cols=1)
     
     colours = ['aqua','darkred','aquamarine', 'azure',
                 'beige', 'bisque', 'black', 'blanchedalmond', 'blue',
@@ -269,7 +290,7 @@ def grapher(data0,posdf0,outstrat0,datatg,posdftg,outstratg,datai,posdfi,outstra
             pass
     fig2.update_layout(        
         height=400,
-        width=1400,
+        width=1500,
         xaxis_showticklabels=True,
         )
     return fig,fig2

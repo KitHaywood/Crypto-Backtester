@@ -40,11 +40,11 @@ def app_layout():
                     id='md-input',
                     type='number',
                     placeholder="input an integer",
-                    value=2000),
+                    value=1000),
                 html.Label(['Select Area'],style={'text-align':'left','color':'black'}),
                     dcc.Input(
                     id='mdd-input',
-                    value=500000,
+                    value=400000,
                     type='number',
                     placeholder="input [0.0 -- 1.0]")
         ]),
